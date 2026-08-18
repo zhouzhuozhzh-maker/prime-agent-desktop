@@ -35,15 +35,19 @@ Prime Agent Desktop turns them into a visible, reviewable workspace.
 
 ## Current state
 
-This repository is an interactive product MVP, not yet a production Prime Agent client.
+The native app now connects to Prime Agent's documented RPC mode. It launches `prime-agent --mode rpc` inside the folder you choose, supervises the process, correlates command responses, and renders streaming messages and tool execution events. Extension confirmations, selections, inputs, and editor requests make a round trip through the desktop UI.
 
-The UI, approval flow, project switching, diff expansion, memory/refine views, schedule toggles, and steering composer are functional. They currently run against `MockAgentAdapter` so the product can be tested independently of an upstream process.
-
-The next milestone is connecting the existing boundary in `src/runtime/PrimeRpcAdapter.ts` to a pinned Prime Agent JSON/RPC release.
+The browser build still uses `MockAgentAdapter`, so the product can be reviewed without granting an agent access to a local project. The live integration is tested against Prime Agent `0.7.3`.
 
 ## Run it
 
-Requirements: Node.js 20+ and npm.
+Requirements: Node.js 22.8+, npm, Rust/Tauri platform prerequisites, and the Prime Agent CLI.
+
+Install Prime Agent from its official release channel:
+
+```bash
+curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh
+```
 
 ```bash
 git clone https://github.com/zhouzhuozhzh-maker/prime-agent-desktop.git
@@ -52,13 +56,17 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`.
+Open `http://127.0.0.1:5173` for the interactive demo.
 
 For the native Tauri shell, install the platform prerequisites and run:
 
 ```bash
 npm run desktop
 ```
+
+The native app asks for a project folder on first launch and starts the local RPC process there. If `prime-agent` is not on the macOS app PATH, set `PRIME_AGENT_BIN` to its absolute path before launching; common nvm, Volta, and local-bin locations are detected automatically.
+
+If the runtime card says **model setup required**, run `prime-agent` once in a terminal and use `/login` (or configure a supported provider API key). The desktop RPC process reuses Prime Agent's local authentication store.
 
 Production checks:
 
@@ -75,10 +83,13 @@ React product UI
       ▼
  AgentAdapter
    ├── MockAgentAdapter       interactive preview
-   └── PrimeRpcAdapter        upstream integration seam
+   └── PrimeRpcAdapter        JSONL command/event mapping
              │
              ▼
-       Prime Agent RPC
+       Tauri process bridge
+             │
+             ▼
+  prime-agent --mode rpc
 ```
 
 Runtime-specific protocol code stays behind `AgentAdapter`; React consumes a small event model for timelines, approvals, status, memory, and refinements. That keeps the UI testable and leaves room for future ACP or app-server adapters.
@@ -90,9 +101,10 @@ See [docs/architecture.md](docs/architecture.md) for the integration rules.
 - [x] Complete desktop workspace and interaction model
 - [x] Tauri 2 shell configuration
 - [x] Mock runtime for visual and workflow testing
-- [ ] Prime Agent RPC process supervision and reconnect
-- [ ] Real streamed tool-call and subagent events
-- [ ] Approval round-trip to the upstream harness
+- [x] Prime Agent RPC process supervision
+- [x] Real streamed message and tool-call events
+- [x] Extension UI request/response round-trip
+- [ ] Session reconnect and subagent observation
 - [ ] Memory/refine diff ingestion and rollback
 - [ ] Local encrypted credential storage
 - [ ] Signed macOS and Windows preview builds
@@ -112,7 +124,7 @@ Use disposable clones or worktrees, keep approvals enabled, and do not run untru
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The most valuable near-term contribution is a narrowly scoped Prime Agent RPC adapter that preserves explicit approvals and durable-change auditing.
+See [CONTRIBUTING.md](CONTRIBUTING.md). The most valuable near-term work is session reconnect, subagent observation, and ingestion of durable memory/refinement changes.
 
 ## Project status and attribution
 

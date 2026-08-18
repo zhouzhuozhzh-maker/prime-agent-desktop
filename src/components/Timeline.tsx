@@ -13,7 +13,7 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
-import type { TimelineEvent } from "../types";
+import type { ExtensionUiRequest, TimelineEvent } from "../types";
 import { DiffView } from "./DiffView";
 
 type TimelineProps = {
@@ -23,6 +23,8 @@ type TimelineProps = {
   onToggleDiff: () => void;
   onApprove: () => void;
   onReject: () => void;
+  onRespond: (value: string) => void;
+  pendingRequest: ExtensionUiRequest | null;
 };
 
 function EventIcon({ event }: { event: TimelineEvent }) {
@@ -41,6 +43,8 @@ export function Timeline({
   onToggleDiff,
   onApprove,
   onReject,
+  onRespond,
+  pendingRequest,
 }: TimelineProps) {
   return (
     <div className="timeline">
@@ -64,7 +68,16 @@ export function Timeline({
                 <div className="approval-heading"><EventIcon event={event} /><strong>{approvalState === "pending" ? event.title : approvalState === "approved" ? "Permission approved" : "Permission rejected"}</strong></div>
                 <p>{event.detail}</p>
                 <div className="command-line"><Code2 size={14} /><code>{event.meta}</code><Copy size={13} /></div>
-                {approvalState === "pending" ? (
+                {approvalState === "pending" && pendingRequest?.method === "select" ? (
+                  <div className="approval-actions option-actions">
+                    {pendingRequest.options?.map((option) => <button className="secondary-button" key={option} onClick={() => onRespond(option)} type="button">{option}</button>)}
+                  </div>
+                ) : approvalState === "pending" && (pendingRequest?.method === "input" || pendingRequest?.method === "editor") ? (
+                  <div className="approval-actions input-actions">
+                    <span>Reply below</span>
+                    <button className="secondary-button" onClick={onReject} type="button">Cancel</button>
+                  </div>
+                ) : approvalState === "pending" ? (
                   <div className="approval-actions">
                     <button className="primary-button" onClick={onApprove} type="button">Approve</button>
                     <button className="secondary-button" onClick={onReject} type="button">Reject</button>
@@ -78,7 +91,7 @@ export function Timeline({
                 <div className="event-heading"><EventIcon event={event} /><strong>{event.title}</strong>{event.meta && <code>{event.meta}</code>}</div>
                 {event.detail && <p>{event.detail}</p>}
                 {event.duration && <span className={`duration duration-${event.status}`}>{event.duration}{event.status === "success" && <CheckCircle2 size={13} />}</span>}
-                {event.type === "checkpoint" && <span className="checkpoint-status">All checks passing <CheckCircle2 size={14} /></span>}
+                {event.type === "checkpoint" && <span className={`checkpoint-status checkpoint-${event.status}`}>{event.status === "failed" ? "Failed" : event.status === "running" ? "In progress" : event.title.toLowerCase().includes("connected") ? "Ready" : "Complete"} <CheckCircle2 size={14} /></span>}
               </div>
             )}
           </div>

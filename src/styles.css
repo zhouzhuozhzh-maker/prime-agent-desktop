@@ -82,7 +82,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid color-mix(in srgb
 .runtime-card span { display: block; font-size: 11px; white-space: nowrap; }
 .runtime-card span i, .running-state i, .section-heading span i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); margin-right: 7px; box-shadow: 0 0 8px rgb(82 201 142 / 40%); }
 .runtime-card small { display: block; margin-top: 7px; color: #7e8589; font-size: 10px; }
+.runtime-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .runtime-card > svg { position: absolute; right: 9px; bottom: 11px; color: #8b9296; }
+.runtime-card.state-error span i, .running-state.state-error i, .runtime-card.state-disconnected span i, .running-state.state-disconnected i { background: var(--red); box-shadow: 0 0 8px rgb(232 70 70 / 35%); }
+.runtime-card.state-connecting span i, .running-state.state-connecting i, .runtime-card.state-waiting span i, .running-state.state-waiting i { background: #f2b84b; box-shadow: 0 0 8px rgb(242 184 75 / 38%); }
 .sidebar-footer { display: grid; grid-template-columns: 56px 1fr 56px; border-top: 1px solid var(--dark-border); align-items: center; }
 .sidebar-footer > button { height: 100%; background: transparent; border: 0; display: grid; place-items: center; color: #9aa0a4; cursor: pointer; }
 .sidebar-footer > button:not(:last-child) { border-right: 1px solid var(--dark-border); }
@@ -127,12 +130,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid color-mix(in srgb
 .event-heading strong { font-weight: 600; }
 .event-heading code { border-radius: 4px; background: #ecedee; padding: 5px 8px; font: 10px "DM Mono", monospace; color: #42474b; overflow: hidden; text-overflow: ellipsis; }
 .event-row p { font-size: 11.5px; line-height: 1.55; max-width: 700px; margin: 4px 0 0 24px; color: #2d3236; }
+.event-tool .event-row p { max-height: 118px; overflow: auto; white-space: pre-wrap; font: 9.5px/1.5 "DM Mono", monospace; color: #51575b; background: #f1f2f2; border-radius: 5px; padding: 8px 10px; }
 .event-thought-copy { padding-bottom: 9px; }
 .event-thought-copy .event-heading > svg { color: var(--accent); }
 .duration { position: absolute; right: 0; top: 5px; font: 9.5px "DM Mono", monospace; color: #777d81; display: flex; align-items: center; gap: 6px; }
 .duration-success svg { color: var(--mint); }
 .duration-failed { color: var(--red); }
 .checkpoint-status { position: absolute; right: 0; top: 5px; display: flex; align-items: center; gap: 5px; color: #299d68; font-size: 10px; }
+.checkpoint-failed { color: var(--red); }
+.checkpoint-running { color: #b47a13; }
 
 .diff-card { border: 1px solid #d5d7d8; border-radius: 7px; background: white; box-shadow: 0 2px 4px rgb(0 0 0 / 2%); overflow: hidden; }
 .diff-title { width: 100%; height: 43px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 0; background: white; color: var(--text); cursor: pointer; }
@@ -164,6 +170,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid color-mix(in srgb
 .command-line { height: 29px; display: flex; align-items: center; gap: 7px; margin-left: 23px; padding: 0 9px; border: 1px solid #d7dadd; border-radius: 4px; background: #eff1f2; color: #60666a; max-width: 430px; }
 .command-line code { font: 9px "DM Mono", monospace; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .approval-actions { position: absolute; right: 14px; top: 40px; display: flex; gap: 8px; }
+.approval-actions.option-actions { position: static; margin: 10px 0 0 23px; flex-wrap: wrap; }
+.approval-actions.option-actions .secondary-button { min-width: 0; }
+.approval-actions.input-actions { align-items: center; }
+.approval-actions.input-actions span { color: #777d81; font-size: 10px; }
 .primary-button, .secondary-button { height: 32px; min-width: 78px; padding: 0 16px; border-radius: 4px; cursor: pointer; font-size: 10px; }
 .primary-button { background: var(--accent); color: white; border: 1px solid var(--accent); box-shadow: 0 3px 9px rgb(240 75 67 / 22%); }
 .secondary-button { background: white; color: #303539; border: 1px solid #aeb3b6; }
@@ -218,6 +228,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid color-mix(in srgb
 .change-remove { color: var(--accent); font-family: "DM Mono", monospace; }
 .section-link { height: 36px; width: 100%; border: 0; background: #171a1d; color: #979da1; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-size: 9.5px; cursor: pointer; }
 .section-link:hover { color: white; background: #1d2124; }
+.empty-ledger { min-height: 48px; display: flex; align-items: center; padding: 10px; color: #6f767a; font-size: 9.5px; line-height: 1.45; background: #15191b; }
 .schedule-row { min-height: 49px; display: grid; grid-template-columns: 22px minmax(0, 1fr) 33px; gap: 7px; align-items: center; padding: 7px 10px; border-bottom: 1px solid #292e31; }
 .schedule-row > svg { color: #9ca2a6; }
 .schedule-row strong { display: block; font-size: 10px; font-weight: 500; }
@@ -230,6 +241,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid color-mix(in srgb
 .tab-intro > svg { color: var(--accent); margin-top: 2px; }
 .tab-intro h2 { font-family: "Manrope", sans-serif; font-size: 13px; margin: 0 0 5px; }
 .tab-intro p { color: #858b8f; font-size: 9.5px; line-height: 1.45; margin: 0; }
+
+.onboarding-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgb(7 9 10 / 76%); backdrop-filter: blur(9px); }
+.onboarding-card { width: min(470px, calc(100vw - 48px)); padding: 37px; border: 1px solid #343a3e; border-radius: 13px; background: #15191b; color: #f1f3f3; box-shadow: 0 24px 80px rgb(0 0 0 / 48%); }
+.onboarding-card .eyebrow { color: var(--accent); font: 10px "DM Mono", monospace; letter-spacing: .13em; }
+.onboarding-card h1 { margin: 13px 0 11px; font: 700 25px/1.18 "Manrope", sans-serif; letter-spacing: -.035em; }
+.onboarding-card p { margin: 0 0 24px; color: #a7adb0; font-size: 12px; line-height: 1.65; }
+.onboarding-card .primary-button { min-width: 155px; height: 38px; }
+.onboarding-card small { display: block; margin-top: 15px; color: #70777b; font-size: 9.5px; }
 
 @media (max-width: 1350px) {
   .app-shell { grid-template-columns: 222px minmax(0, 1fr); }

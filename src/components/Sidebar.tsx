@@ -17,9 +17,13 @@ type SidebarProps = {
   projects: Project[];
   selectedProject: string;
   onSelectProject: (id: string) => void;
+  onAddProject: () => void;
+  runtimeLabel: string;
+  runtimeDetail: string;
+  runtimeStatus: "disconnected" | "connecting" | "idle" | "running" | "waiting" | "error";
 };
 
-export function Sidebar({ projects, selectedProject, onSelectProject }: SidebarProps) {
+export function Sidebar({ projects, selectedProject, onSelectProject, onAddProject, runtimeLabel, runtimeDetail, runtimeStatus }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="brand-row">
@@ -43,7 +47,7 @@ export function Sidebar({ projects, selectedProject, onSelectProject }: SidebarP
 
           <div className="pane-heading">
             <span>Projects</span>
-            <button aria-label="Add project" type="button"><Plus size={15} /></button>
+            <button aria-label="Add project" onClick={onAddProject} type="button"><Plus size={15} /></button>
           </div>
 
           <div className="project-list">
@@ -63,9 +67,9 @@ export function Sidebar({ projects, selectedProject, onSelectProject }: SidebarP
             ))}
           </div>
 
-          <button className="runtime-card" type="button">
-            <span><i /> Prime Agent v0.6.2</span>
-            <small>Connected</small>
+          <button className={`runtime-card state-${runtimeStatus}`} type="button">
+            <span><i /> {runtimeLabel}</span>
+            <small title={runtimeDetail}>{runtimeDetail}</small>
             <ChevronUp size={15} />
           </button>
         </div>

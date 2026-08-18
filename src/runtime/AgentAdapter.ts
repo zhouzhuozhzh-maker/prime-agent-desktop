@@ -6,5 +6,6 @@ export interface AgentAdapter {
   sendPrompt(prompt: string): Promise<void>;
   approve(id: string): Promise<void>;
   reject(id: string): Promise<void>;
+  respond(id: string, value: string): Promise<void>;
   subscribe(listener: (event: AgentEvent) => void): () => void;
 }

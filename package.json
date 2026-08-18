@@ -16,6 +16,8 @@
     "@fontsource/dm-mono": "^5.2.6",
     "@fontsource/inter": "^5.2.6",
     "@fontsource/manrope": "^5.2.6",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

@@ -20,6 +20,7 @@ Before opening a pull request, run:
 ```bash
 npm run check
 npm run build
+cd src-tauri && cargo check --locked
 ```
 
 ## Product rules

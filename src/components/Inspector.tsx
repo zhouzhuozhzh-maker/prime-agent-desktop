@@ -1,8 +1,5 @@
 import {
-  Bot,
   Brain,
-  CheckCircle2,
-  ChevronDown,
   Clock3,
   ExternalLink,
   GitCommitHorizontal,
@@ -32,9 +29,10 @@ const tabs: Array<{ id: InspectorTab; label: string }> = [
 ];
 
 function AgentTree({ agents }: { agents: AgentNode[] }) {
+  const liveCount = agents.filter((agent) => agent.status === "live").length;
   return (
     <section className="inspector-section agent-section">
-      <div className="section-heading"><h2>Agent tree</h2><span><i />3 live</span></div>
+      <div className="section-heading"><h2>Agent tree</h2><span><i />{liveCount} live</span></div>
       <div className="agent-tree">
         {agents.map((agent) => (
           <div className={`agent-row depth-${agent.depth}`} key={agent.id}>
@@ -44,6 +42,7 @@ function AgentTree({ agents }: { agents: AgentNode[] }) {
             <span className={`live-dot ${agent.status}`} title={agent.status} />
           </div>
         ))}
+        {agents.length === 0 && <div className="empty-ledger">No active agent session</div>}
       </div>
     </section>
   );
@@ -61,6 +60,7 @@ function MemoryList({ memories, full = false }: { memories: MemoryEntry[]; full?
             <div><strong>{memory.title}</strong><p>{memory.detail}</p><small>Context: {memory.context}</small></div>
           </article>
         ))}
+        {memories.length === 0 && <div className="empty-ledger">Memory events will appear when upstream exposes them.</div>}
       </div>
     </section>
   );
@@ -79,7 +79,7 @@ function RefineList({ entries, full = false }: { entries: RefineEntry[]; full?: 
             <div><strong>{entry.title}</strong>{full && <small>{entry.detail}</small>}</div>
           </article>
         ))}
-        <button className="section-link" type="button">View full ledger <ExternalLink size={13} /></button>
+        {entries.length === 0 ? <div className="empty-ledger">No refinement events in this session</div> : <button className="section-link" type="button">View full ledger <ExternalLink size={13} /></button>}
       </div>
     </section>
   );
@@ -102,7 +102,7 @@ function ScheduleList({ schedules, onToggle }: { schedules: ScheduleEntry[]; onT
             ><i /></button>
           </article>
         ))}
-        <button className="section-link" type="button">View all schedules <ExternalLink size={13} /></button>
+        {schedules.length === 0 ? <div className="empty-ledger">Schedule sync is not connected yet.</div> : <button className="section-link" type="button">View all schedules <ExternalLink size={13} /></button>}
       </div>
     </section>
   );

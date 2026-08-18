@@ -3,6 +3,7 @@ export type Project = {
   name: string;
   branch: string;
   status: "active" | "idle";
+  path?: string;
 };
 
 export type AgentNode = {
@@ -22,6 +23,16 @@ export type TimelineEvent = {
   meta?: string;
   duration?: string;
   status?: "running" | "success" | "failed" | "pending";
+};
+
+export type ExtensionUiRequest = {
+  id: string;
+  method: "select" | "confirm" | "input" | "editor";
+  title: string;
+  message?: string;
+  options?: string[];
+  placeholder?: string;
+  prefill?: string;
 };
 
 export type MemoryEntry = {
@@ -50,6 +61,8 @@ export type ScheduleEntry = {
 };
 
 export type AgentEvent =
-  | { type: "connected"; version: string }
-  | { type: "timeline"; event: TimelineEvent }
-  | { type: "status"; value: "idle" | "running" | "waiting" };
+  | { type: "connected"; version: string; configured?: boolean }
+  | { type: "timeline"; event: TimelineEvent; operation?: "append" | "replace" }
+  | { type: "status"; value: "idle" | "running" | "waiting" }
+  | { type: "ui-request"; request: ExtensionUiRequest | null }
+  | { type: "runtime-error"; message: string };

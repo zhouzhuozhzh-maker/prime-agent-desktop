@@ -5,7 +5,7 @@ export class MockAgentAdapter implements AgentAdapter {
   private listeners = new Set<(event: AgentEvent) => void>();
 
   async connect() {
-    this.emit({ type: "connected", version: "demo-runtime" });
+    this.emit({ type: "connected", version: "demo-runtime", configured: true });
   }
 
   async disconnect() {
@@ -32,6 +32,10 @@ export class MockAgentAdapter implements AgentAdapter {
 
   async reject(_id: string) {
     this.emit({ type: "status", value: "waiting" });
+  }
+
+  async respond(_id: string, _value: string) {
+    this.emit({ type: "status", value: "running" });
   }
 
   subscribe(listener: (event: AgentEvent) => void) {
