@@ -1,4 +1,4 @@
-import { Bookmark, Copy, List, MoreHorizontal } from "lucide-react";
+import { FileDiff, Plus, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Composer } from "./components/Composer";
 import { Inspector, type InspectorTab } from "./components/Inspector";
@@ -39,6 +39,7 @@ export function App() {
   const [taskTitle, setTaskTitle] = useState(isTauri ? "New Prime Agent session" : "Fix the flaky billing tests");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [runtimeRevision, setRuntimeRevision] = useState(0);
+  const [confirmNewTask, setConfirmNewTask] = useState(false);
 
   const projectList = useMemo<Project[]>(() => {
     if (!isTauri) return projects;
@@ -57,7 +58,7 @@ export function App() {
     detail: runtimeStatus === "running" ? "Working in the selected project" : runtimeStatus === "waiting" ? "Waiting for your response" : runtimeStatus === "idle" ? "RPC session ready" : "Runtime unavailable",
     status: runtimeStatus === "running" ? "live" as const : runtimeStatus === "waiting" ? "waiting" as const : "done" as const,
     depth: 0,
-  }] : agents, [runtimeStatus]);
+  }] : timeline.length > 0 ? agents : [], [runtimeStatus, timeline.length]);
 
   useEffect(() => {
     if (isTauri && !projectPath) return;
@@ -101,6 +102,15 @@ export function App() {
       void adapter.disconnect();
     };
   }, [adapter, projectPath]);
+
+  useEffect(() => {
+    if (!confirmNewTask) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setConfirmNewTask(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmNewTask]);
 
   async function chooseProject() {
     if (!isTauri) return;
@@ -161,10 +171,49 @@ export function App() {
     }
   }
 
+  function resetSession() {
+    setTimeline([]);
+    setPendingRequest(null);
+    setApprovalState("pending");
+    setDiffExpanded(true);
+    setTaskTitle("New Prime Agent session");
+    setActiveTab("agents");
+    setConfirmNewTask(false);
+    if (isTauri && projectPath) setRuntimeRevision((value) => value + 1);
+  }
+
+  function handleNewTask() {
+    if (!projectPath && isTauri) {
+      void chooseProject();
+      return;
+    }
+    if (runtimeStatus === "running" || runtimeStatus === "waiting") {
+      setConfirmNewTask(true);
+      return;
+    }
+    resetSession();
+  }
+
+  function reconnect() {
+    setRuntimeStatus("connecting");
+    setRuntimeDetail("Restarting local RPC process…");
+    setRuntimeRevision((value) => value + 1);
+  }
+
+  function reviewChanges() {
+    setActiveTab("changes");
+    window.setTimeout(() => document.querySelector(".diff-card")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  }
+
+  const hasChanges = timeline.some((event) => event.type === "diff");
+
   return (
     <main className="app-shell">
       <Sidebar
         onAddProject={() => void chooseProject()}
+        onNewTask={handleNewTask}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onReconnect={reconnect}
         onSelectProject={setSelectedProject}
         projects={projectList}
         runtimeDetail={runtimeDetail}
@@ -173,15 +222,15 @@ export function App() {
         selectedProject={selectedProject}
       />
       <section className="workspace">
-        <TopBar onOpenSettings={() => setSettingsOpen(true)} project={project} runtimeStatus={runtimeStatus} />
+        <TopBar onNewTask={handleNewTask} onOpenSettings={() => setSettingsOpen(true)} onReconnect={reconnect} project={project} runtimeStatus={runtimeStatus} />
         <div className="workspace-columns">
           <section className="task-panel">
             <header className="task-header">
-              <div><h1>{taskTitle}</h1><button aria-label="Copy task link" type="button"><Copy size={14} /></button></div>
+              <div><h1>{taskTitle}</h1><span className={`task-status status-${runtimeStatus}`}>{runtimeStatus === "running" ? "Working" : runtimeStatus === "waiting" ? "Needs input" : runtimeStatus === "error" ? "Interrupted" : runtimeStatus === "connecting" ? "Connecting" : "Ready"}</span></div>
               <nav>
-                <button aria-label="Bookmark task" type="button"><Bookmark size={16} /></button>
-                <button aria-label="Task outline" type="button"><List size={16} /></button>
-                <button aria-label="More task actions" type="button"><MoreHorizontal size={17} /></button>
+                {runtimeStatus === "error" && <button className="task-action" onClick={reconnect} type="button"><RotateCcw size={14} />Reconnect</button>}
+                {hasChanges && <button className="task-action" onClick={reviewChanges} type="button"><FileDiff size={14} />Review changes</button>}
+                <button className="task-action" onClick={handleNewTask} type="button"><Plus size={15} />New task</button>
               </nav>
             </header>
             <div className="task-scroll">
@@ -193,6 +242,7 @@ export function App() {
                 onReject={handleReject}
                 onRespond={(value) => void handleRespond(value)}
                 onToggleDiff={() => setDiffExpanded((value) => !value)}
+                onPromptSuggestion={(prompt) => void handleSend(prompt)}
                 pendingRequest={pendingRequest}
               />
             </div>
@@ -206,11 +256,13 @@ export function App() {
           <Inspector
             activeTab={activeTab}
             agents={visibleAgents}
-            memories={isTauri ? [] : memories}
+            memories={isTauri || timeline.length === 0 ? [] : memories}
+            events={timeline}
+            onReviewChanges={reviewChanges}
             onTabChange={setActiveTab}
             onToggleSchedule={toggleSchedule}
-            refinements={isTauri ? [] : refinements}
-            schedules={isTauri ? [] : schedules}
+            refinements={isTauri || timeline.length === 0 ? [] : refinements}
+            schedules={isTauri || timeline.length === 0 ? [] : schedules}
           />
         </div>
       </section>
@@ -230,6 +282,16 @@ export function App() {
         onConfigurationChanged={() => setRuntimeRevision((value) => value + 1)}
         open={settingsOpen}
       />
+      {confirmNewTask && (
+        <div className="confirm-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setConfirmNewTask(false)}>
+          <section aria-labelledby="new-task-title" aria-modal="true" className="confirm-card" role="dialog">
+            <span className="confirm-icon"><Plus size={18} /></span>
+            <h2 id="new-task-title">Start a new task?</h2>
+            <p>The current run will stop and its timeline will be cleared from this window. Files already changed in the project stay untouched.</p>
+            <div><button autoFocus className="secondary-button" onClick={() => setConfirmNewTask(false)} type="button">Keep working</button><button className="primary-button" onClick={resetSession} type="button">Start new task</button></div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowUpRight, Check, ChevronRight, Cloud, Database, Github, KeyRound, Search, Server, Sparkles, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { providers, type ProviderDefinition } from "../data/providers";
 
 type ConfigSnapshot = {
@@ -35,6 +35,7 @@ function readableError(error: unknown) {
 export function SettingsCenter({ open, onClose, onConfigurationChanged }: SettingsCenterProps) {
   const [tab, setTab] = useState<"providers" | "resources">("providers");
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "configured">("all");
   const [snapshot, setSnapshot] = useState<ConfigSnapshot>(emptySnapshot);
   const [selected, setSelected] = useState<ProviderDefinition | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -43,29 +44,61 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
   const [makeDefault, setMakeDefault] = useState(false);
   const [serperKey, setSerperKey] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState<"info" | "success" | "error">("info");
+  const [baseline, setBaseline] = useState({ modelId: "", baseUrl: "", makeDefault: false });
+  const searchRef = useRef<HTMLInputElement>(null);
+  const settingsRef = useRef<HTMLElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
 
-  async function refresh() {
+  async function refresh(): Promise<ConfigSnapshot> {
     if (!isTauri) {
-      setSnapshot({ ...emptySnapshot, configuredProviders: ["volcengine-agent-plan"], defaultProvider: "volcengine-agent-plan", defaultModel: "doubao-seed-2.0-pro", skillDirectoryCount: 1 });
-      return;
+      const preview = { ...emptySnapshot, configuredProviders: ["volcengine-agent-plan"], defaultProvider: "volcengine-agent-plan", defaultModel: "doubao-seed-2.0-pro", skillDirectoryCount: 1 };
+      setSnapshot(preview);
+      return preview;
     }
     try {
-      setSnapshot(await invoke<ConfigSnapshot>("prime_config_status"));
+      const next = await invoke<ConfigSnapshot>("prime_config_status");
+      setSnapshot(next);
+      return next;
     } catch (error) {
       setMessage(readableError(error));
+      setMessageKind("error");
+      return emptySnapshot;
     }
   }
 
   useEffect(() => {
     if (!open) return;
-    void refresh();
+    previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setLoading(true);
+    void refresh().then((next) => {
+      const initial = providers.find((provider) => provider.id === next.defaultProvider) ?? providers[0];
+      selectProvider(initial, next);
+      setLoading(false);
+      window.requestAnimationFrame(() => searchRef.current?.focus());
+    });
+    return () => previousFocus.current?.focus();
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (event.key === "Tab" && settingsRef.current) {
+        const focusable = Array.from(settingsRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'));
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (!first || !last) return;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -73,34 +106,46 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
 
   const visibleProviders = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return providers;
-    return providers.filter((provider) => [provider.name, provider.description, provider.region, provider.envVar].some((value) => value?.toLowerCase().includes(normalized)));
-  }, [query]);
+    return providers.filter((provider) => {
+      if (filter === "configured" && !snapshot.configuredProviders.includes(provider.id)) return false;
+      return !normalized || [provider.name, provider.description, provider.region, provider.envVar].some((value) => value?.toLowerCase().includes(normalized));
+    });
+  }, [filter, query, snapshot.configuredProviders]);
+
+  const providerDirty = Boolean(apiKey.trim()) || modelId !== baseline.modelId || baseUrl !== baseline.baseUrl || makeDefault !== baseline.makeDefault;
+  const selectedConfigured = selected ? snapshot.configuredProviders.includes(selected.id) : false;
 
   if (!open) return null;
 
-  function selectProvider(provider: ProviderDefinition) {
+  function selectProvider(provider: ProviderDefinition, currentSnapshot = snapshot) {
+    const initialModelId = currentSnapshot.defaultProvider === provider.id ? currentSnapshot.defaultModel ?? provider.custom?.modelId ?? "" : provider.custom?.modelId ?? "";
+    const initialBaseUrl = provider.custom?.baseUrl ?? "";
+    const initialDefault = currentSnapshot.defaultProvider === provider.id;
     setSelected(provider);
     setApiKey("");
-    setModelId(provider.custom?.modelId ?? "");
-    setBaseUrl(provider.custom?.baseUrl ?? "");
-    setMakeDefault(Boolean(provider.custom));
+    setModelId(initialModelId);
+    setBaseUrl(initialBaseUrl);
+    setMakeDefault(initialDefault);
+    setBaseline({ modelId: initialModelId, baseUrl: initialBaseUrl, makeDefault: initialDefault });
     setMessage("");
   }
 
   async function saveProvider() {
     if (!selected) return;
     if (!isTauri) {
-      setMessage("配置写入仅在桌面应用中可用；当前是交互预览。");
+      setMessage("Saving is available in the desktop app. This browser build is an interactive preview.");
+      setMessageKind("info");
       return;
     }
     const alreadyConfigured = snapshot.configuredProviders.includes(selected.id);
     if (!apiKey.trim() && !alreadyConfigured) {
-      setMessage("请输入 API Key；密钥只会写入 macOS 钥匙串。");
+      setMessage("Enter an API key. It will only be stored in macOS Keychain.");
+      setMessageKind("error");
       return;
     }
     if (makeDefault && !modelId.trim()) {
-      setMessage("设为默认 Provider 时需要填写 Model ID。");
+      setMessage("A model ID is required when setting a default provider.");
+      setMessageKind("error");
       return;
     }
     setSaving(true);
@@ -117,11 +162,16 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
         },
       });
       setApiKey("");
-      setMessage("已安全保存。Prime Agent 会用新配置重新连接。");
-      await refresh();
+      setMessage("Saved securely. Prime Agent is reconnecting with this configuration.");
+      setMessageKind("success");
+      const next = await refresh();
+      selectProvider(selected, next);
+      setMessage("Saved securely. Prime Agent is reconnecting with this configuration.");
+      setMessageKind("success");
       onConfigurationChanged();
     } catch (error) {
       setMessage(readableError(error));
+      setMessageKind("error");
     } finally {
       setSaving(false);
     }
@@ -129,11 +179,13 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
 
   async function saveSerper() {
     if (!isTauri) {
-      setMessage("联网资源配置仅在桌面应用中可用；当前是交互预览。");
+      setMessage("Resource configuration is available in the desktop app. This browser build is an interactive preview.");
+      setMessageKind("info");
       return;
     }
     if (!serperKey.trim()) {
-      setMessage("请输入 Serper API Key。");
+      setMessage("Enter a Serper API key.");
+      setMessageKind("error");
       return;
     }
     setSaving(true);
@@ -141,11 +193,13 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
     try {
       await invoke("prime_save_service_credential", { serviceId: "serper", apiKey: serperKey.trim() });
       setSerperKey("");
-      setMessage("联网搜索已启用，新会话会自动加载 Serper。");
+      setMessage("Web search is enabled. New sessions will load Serper automatically.");
+      setMessageKind("success");
       await refresh();
       onConfigurationChanged();
     } catch (error) {
       setMessage(readableError(error));
+      setMessageKind("error");
     } finally {
       setSaving(false);
     }
@@ -153,9 +207,9 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
 
   return (
     <div className="settings-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section aria-label="Prime Agent settings" aria-modal="true" className="settings-center" role="dialog">
+      <section aria-labelledby="settings-title" aria-modal="true" className="settings-center" ref={settingsRef} role="dialog">
         <header className="settings-header">
-          <div><span className="eyebrow">RUNTIME CONFIG</span><h1>Models & resources</h1><p>Configure Prime Agent without putting secrets in project files.</p></div>
+          <div><span className="eyebrow">RUNTIME CONFIG</span><h1 id="settings-title">Models & resources</h1><p>Configure Prime Agent without putting secrets in project files.</p></div>
           <button aria-label="Close settings" onClick={onClose} type="button"><X size={19} /></button>
         </header>
         <nav className="settings-tabs">
@@ -166,8 +220,9 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
         {tab === "providers" ? (
           <div className="settings-body provider-layout">
             <div className="provider-browser">
-              <label className="settings-search"><Search size={15} /><input aria-label="Search providers" onChange={(event) => setQuery(event.target.value)} placeholder="Search providers" value={query} /></label>
+              <div className="provider-tools"><label className="settings-search"><Search size={15} /><input aria-label="Search providers" onChange={(event) => setQuery(event.target.value)} placeholder="Search providers" ref={searchRef} value={query} /></label><div className="provider-filters" aria-label="Provider filters"><button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")} type="button">All</button><button className={filter === "configured" ? "active" : ""} onClick={() => setFilter("configured")} type="button">Configured</button></div></div>
               <div className="provider-list">
+                {loading && <p className="provider-list-state">Loading provider status…</p>}
                 {visibleProviders.map((provider, index) => {
                   const configured = snapshot.configuredProviders.includes(provider.id);
                   const active = snapshot.defaultProvider === provider.id;
@@ -179,6 +234,7 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
                     </button>
                   );
                 })}
+                {!loading && visibleProviders.length === 0 && <p className="provider-list-state">No providers match this filter.</p>}
               </div>
             </div>
 
@@ -186,30 +242,30 @@ export function SettingsCenter({ open, onClose, onConfigurationChanged }: Settin
               {selected ? (
                 <>
                   <div className="detail-heading"><span className="provider-monogram large">{selected.name.slice(0, 2).toUpperCase()}</span><div><span>{selected.badge ?? "PRIME AGENT NATIVE"}</span><h2>{selected.name}</h2><p>{selected.description}</p></div></div>
-                  <div className="secure-note"><KeyRound size={16} /><div><strong>Keychain protected</strong><p>API Key 存入 macOS 钥匙串，Prime Agent 配置只保留安全引用。</p></div></div>
-                  <label className="field-label">API Key <span>{snapshot.configuredProviders.includes(selected.id) ? "已配置，留空可保留" : "必填"}</span><input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={snapshot.configuredProviders.includes(selected.id) ? "••••••••  Keep existing key" : "Paste API key"} type="password" value={apiKey} /></label>
+                  <div className="secure-note"><KeyRound size={16} /><div><strong>Keychain protected</strong><p>Your API key stays in macOS Keychain. Prime Agent stores only a secure reference.</p></div></div>
+                  <label className="field-label">API Key <span>{snapshot.configuredProviders.includes(selected.id) ? "Configured — leave blank to keep it" : "Required"}</span><input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={snapshot.configuredProviders.includes(selected.id) ? "••••••••  Keep existing key" : "Paste API key"} type="password" value={apiKey} /></label>
                   {selected.custom && <label className="field-label">Base URL <input onChange={(event) => setBaseUrl(event.target.value)} spellCheck={false} value={baseUrl} /></label>}
-                  <label className="field-label">Model ID <span>{selected.custom ? "可按控制台修改" : "仅在设为默认时需要"}</span><input onChange={(event) => setModelId(event.target.value)} placeholder="e.g. provider model id" spellCheck={false} value={modelId} /></label>
-                  <label className="default-check"><input checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} type="checkbox" />保存后设为当前默认 Provider</label>
-                  <div className="detail-actions"><button className="primary-button" disabled={saving} onClick={() => void saveProvider()} type="button">{saving ? "Saving…" : "Save configuration"}</button><a href={selected.docs} rel="noreferrer" target="_blank">Official docs <ArrowUpRight size={13} /></a></div>
+                  <label className="field-label">Model ID <span>{selected.custom ? "Use the ID shown in your provider console" : "Required only when making this the default"}</span><input onChange={(event) => setModelId(event.target.value)} placeholder="e.g. provider model id" spellCheck={false} value={modelId} /></label>
+                  <label className="default-check"><input checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} type="checkbox" />Make this the default provider after saving</label>
+                  <div className="detail-actions"><button className="primary-button" disabled={saving || (!providerDirty && selectedConfigured) || (!selectedConfigured && !apiKey.trim())} onClick={() => void saveProvider()} type="button">{saving ? "Saving…" : !providerDirty && selectedConfigured ? "Configuration saved" : "Save configuration"}</button><a href={selected.docs} rel="noreferrer" target="_blank">Official docs <ArrowUpRight size={13} /></a></div>
                 </>
               ) : (
                 <div className="detail-empty"><Sparkles size={25} /><h2>Choose a provider</h2><p>火山引擎与 BytePlus 已置顶。选择一项后可安全保存 Key、Base URL 和默认模型。</p><div><b>{snapshot.configuredProviders.length}</b><span>configured</span><b>{snapshot.defaultModel ? "1" : "0"}</b><span>active model</span></div></div>
               )}
-              {message && <p className="settings-message">{message}</p>}
+              {message && <p aria-live="polite" className={`settings-message message-${messageKind}`} role={messageKind === "error" ? "alert" : "status"}>{message}</p>}
             </div>
           </div>
         ) : (
           <div className="settings-body resources-layout">
-            <section className="resource-hero"><div><span className="eyebrow">RECOMMENDED</span><h2>Give the agent fresh information</h2><p>模型推理本身不依赖联网搜索；但新闻、价格、文档版本和实时事实需要搜索资源。Prime Agent 原生使用 Serper。</p></div><Search size={34} /></section>
+            <section className="resource-hero"><div><span className="eyebrow">RECOMMENDED</span><h2>Give the agent fresh information</h2><p>Reasoning works without search, but news, prices, documentation changes, and other time-sensitive facts need a live source. Prime Agent supports Serper natively.</p></div><Search size={34} /></section>
             <div className="resource-grid">
-              <article className="resource-card resource-featured"><div className="resource-title"><span><Search size={17} /></span><div><strong>Serper web search</strong><small>Prime Agent bundled skill</small></div><i className={snapshot.serperConfigured ? "ready" : "recommended"}>{snapshot.serperConfigured ? "READY" : "RECOMMENDED"}</i></div><p>Google 搜索结果会直接进入 Agent 的 IPython 工具链，适合需要最新信息的任务。</p><label className="resource-key"><input autoComplete="off" onChange={(event) => setSerperKey(event.target.value)} placeholder={snapshot.serperConfigured ? "••••••••  Update key" : "Serper API Key"} type="password" value={serperKey} /><button disabled={saving} onClick={() => void saveSerper()} type="button">{snapshot.serperConfigured ? "Update" : "Enable"}</button></label><a href="https://serper.dev" rel="noreferrer" target="_blank">Get a key <ArrowUpRight size={12} /></a></article>
-              <ResourceCard icon={<Server size={17} />} name="MCP connections" status={snapshot.mcpServerCount ? `${snapshot.mcpServerCount} CONNECTED` : "OPTIONAL"} text="连接数据库、搜索、浏览器和企业 SaaS。当前可继续通过 Prime Agent /login 管理 OAuth MCP。" />
-              <ResourceCard icon={<Sparkles size={17} />} name="Skills" status={snapshot.skillDirectoryCount ? "AVAILABLE" : "BUILT-IN"} text="自动加载项目、用户与 Prime Agent 内置 skills；也兼容 .agents/skills 目录。" />
-              <ResourceCard icon={<Github size={17} />} name="GitHub CLI" status={snapshot.githubConfigured ? "READY" : "OPTIONAL"} text="用于读取仓库、Issue、PR 和 Actions。需要本机 gh 登录后才能访问私有仓库。" />
-              <ResourceCard icon={<Database size={17} />} name="Local IPython runtime" status="BUILT-IN" text="Prime Agent 的工具、子 Agent 与 Python-backed skills 共用持久运行时，无需额外配置。" />
+              <article className="resource-card resource-featured"><div className="resource-title"><span><Search size={17} /></span><div><strong>Serper web search</strong><small>Prime Agent bundled skill</small></div><i className={snapshot.serperConfigured ? "ready" : "recommended"}>{snapshot.serperConfigured ? "READY" : "RECOMMENDED"}</i></div><p>Google results flow into the agent's IPython toolchain for tasks that depend on current information.</p><label className="resource-key"><input autoComplete="off" onChange={(event) => setSerperKey(event.target.value)} placeholder={snapshot.serperConfigured ? "••••••••  Update key" : "Serper API Key"} type="password" value={serperKey} /><button disabled={saving || !serperKey.trim()} onClick={() => void saveSerper()} type="button">{snapshot.serperConfigured ? "Update" : "Enable"}</button></label><a href="https://serper.dev" rel="noreferrer" target="_blank">Get a key <ArrowUpRight size={12} /></a></article>
+              <ResourceCard icon={<Server size={17} />} name="MCP connections" status={snapshot.mcpServerCount ? `${snapshot.mcpServerCount} CONNECTED` : "OPTIONAL"} text="Connect databases, search, browsers, and business apps. OAuth MCP connections remain manageable through Prime Agent /login." />
+              <ResourceCard icon={<Sparkles size={17} />} name="Skills" status={snapshot.skillDirectoryCount ? "AVAILABLE" : "BUILT-IN"} text="Loads project, user, and bundled Prime Agent skills, including compatible .agents/skills directories." />
+              <ResourceCard icon={<Github size={17} />} name="GitHub CLI" status={snapshot.githubConfigured ? "READY" : "OPTIONAL"} text="Read repositories, issues, pull requests, and Actions. Sign in with gh locally to access private repositories." />
+              <ResourceCard icon={<Database size={17} />} name="Local IPython runtime" status="BUILT-IN" text="Prime Agent tools, subagents, and Python-backed skills share a persistent local runtime with no extra setup." />
             </div>
-            {message && <p className="settings-message resource-message">{message}</p>}
+            {message && <p aria-live="polite" className={`settings-message resource-message message-${messageKind}`} role={messageKind === "error" ? "alert" : "status"}>{message}</p>}
           </div>
         )}
       </section>

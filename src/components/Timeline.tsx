@@ -13,6 +13,7 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react";
+import { useState } from "react";
 import type { ExtensionUiRequest, TimelineEvent } from "../types";
 import { DiffView } from "./DiffView";
 
@@ -25,6 +26,7 @@ type TimelineProps = {
   onReject: () => void;
   onRespond: (value: string) => void;
   pendingRequest: ExtensionUiRequest | null;
+  onPromptSuggestion: (prompt: string) => void;
 };
 
 function EventIcon({ event }: { event: TimelineEvent }) {
@@ -45,7 +47,37 @@ export function Timeline({
   onReject,
   onRespond,
   pendingRequest,
+  onPromptSuggestion,
 }: TimelineProps) {
+  const [copiedCommand, setCopiedCommand] = useState(false);
+
+  async function copyCommand(command?: string) {
+    if (!command) return;
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedCommand(true);
+      window.setTimeout(() => setCopiedCommand(false), 1600);
+    } catch {
+      setCopiedCommand(false);
+    }
+  }
+
+  if (events.length === 0) {
+    const suggestions = [
+      "Map this codebase and identify the highest-risk area",
+      "Run the test suite and fix the first failing test",
+      "Review the current changes and suggest improvements",
+    ];
+    return (
+      <div className="empty-session">
+        <span><Bot size={20} /></span>
+        <h2>What should Prime Agent take on?</h2>
+        <p>Give it an outcome. You can steer the run, approve sensitive actions, and review every change here.</p>
+        <div>{suggestions.map((prompt) => <button key={prompt} onClick={() => onPromptSuggestion(prompt)} type="button">{prompt}</button>)}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="timeline">
       {events.map((event) => (
@@ -59,7 +91,7 @@ export function Timeline({
               <div className="diff-card">
                 <button className="diff-title" onClick={onToggleDiff} type="button">
                   <span><EventIcon event={event} /><strong>{event.title}</strong><small>{event.meta}</small></span>
-                  <span className="diff-stats"><b>+18</b><em>−12</em><i>View file</i>{diffExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</span>
+                  <span className="diff-stats"><b>+18</b><em>−12</em><i>{diffExpanded ? "Hide diff" : "Review diff"}</i>{diffExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</span>
                 </button>
                 {diffExpanded && <DiffView />}
               </div>
@@ -67,7 +99,7 @@ export function Timeline({
               <div className={`approval-card approval-${approvalState}`}>
                 <div className="approval-heading"><EventIcon event={event} /><strong>{approvalState === "pending" ? event.title : approvalState === "approved" ? "Permission approved" : "Permission rejected"}</strong></div>
                 <p>{event.detail}</p>
-                <div className="command-line"><Code2 size={14} /><code>{event.meta}</code><Copy size={13} /></div>
+                <div className="command-line"><Code2 size={14} /><code>{event.meta}</code><button aria-label="Copy command" onClick={() => void copyCommand(event.meta)} type="button">{copiedCommand ? <Check size={13} /> : <Copy size={13} />}</button></div>
                 {approvalState === "pending" && pendingRequest?.method === "select" ? (
                   <div className="approval-actions option-actions">
                     {pendingRequest.options?.map((option) => <button className="secondary-button" key={option} onClick={() => onRespond(option)} type="button">{option}</button>)}
