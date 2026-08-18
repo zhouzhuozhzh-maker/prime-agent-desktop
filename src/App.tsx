@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Composer } from "./components/Composer";
 import { Inspector, type InspectorTab } from "./components/Inspector";
 import { Sidebar } from "./components/Sidebar";
+import { SettingsCenter } from "./components/SettingsCenter";
 import { Timeline } from "./components/Timeline";
 import { TopBar } from "./components/TopBar";
 import { agents, initialTimeline, memories, projects, refinements, schedules as initialSchedules } from "./data/demo";
@@ -36,6 +37,8 @@ export function App() {
   const [runtimeLabel, setRuntimeLabel] = useState(isTauri ? "Prime Agent" : "Demo runtime");
   const [runtimeDetail, setRuntimeDetail] = useState(isTauri ? "Choose a project to connect" : "Interactive preview");
   const [taskTitle, setTaskTitle] = useState(isTauri ? "New Prime Agent session" : "Fix the flaky billing tests");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [runtimeRevision, setRuntimeRevision] = useState(0);
 
   const projectList = useMemo<Project[]>(() => {
     if (!isTauri) return projects;
@@ -47,7 +50,7 @@ export function App() {
     [projectList, selectedProject],
   );
 
-  const adapter = useMemo<AgentAdapter>(() => isTauri && projectPath ? new PrimeRpcAdapter(projectPath) : new MockAgentAdapter(), [projectPath]);
+  const adapter = useMemo<AgentAdapter>(() => isTauri && projectPath ? new PrimeRpcAdapter(projectPath) : new MockAgentAdapter(), [projectPath, runtimeRevision]);
   const visibleAgents = useMemo(() => isTauri ? [{
     id: "prime-agent",
     name: "Prime Agent",
@@ -170,7 +173,7 @@ export function App() {
         selectedProject={selectedProject}
       />
       <section className="workspace">
-        <TopBar project={project} runtimeStatus={runtimeStatus} />
+        <TopBar onOpenSettings={() => setSettingsOpen(true)} project={project} runtimeStatus={runtimeStatus} />
         <div className="workspace-columns">
           <section className="task-panel">
             <header className="task-header">
@@ -222,6 +225,11 @@ export function App() {
           </section>
         </div>
       )}
+      <SettingsCenter
+        onClose={() => setSettingsOpen(false)}
+        onConfigurationChanged={() => setRuntimeRevision((value) => value + 1)}
+        open={settingsOpen}
+      />
     </main>
   );
 }

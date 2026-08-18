@@ -39,6 +39,22 @@ The native app now connects to Prime Agent's documented RPC mode. It launches `p
 
 The browser build still uses `MockAgentAdapter`, so the product can be reviewed without granting an agent access to a local project. The live integration is tested against Prime Agent `0.7.3`.
 
+## Models & resources
+
+The desktop settings center now configures Prime Agent directly. Volcengine Agent Plan, BytePlus Coding Plan, and both ModelArk pay-as-you-go endpoints are pinned first, followed by the API-key providers in Prime Agent's current built-in catalog: Anthropic, OpenAI, Gemini, DeepSeek, OpenRouter, xAI, Groq, Mistral, Cerebras, Z.AI, Fireworks, Kimi, MiniMax, Hugging Face, Vercel AI Gateway, Prime Inference, and Xiaomi MiMo.
+
+<p align="center">
+  <img src="docs/assets/provider-center.jpg" alt="Prime Agent Desktop provider center with Volcengine and BytePlus pinned first, secure Keychain storage, Base URL, and model settings">
+</p>
+
+On macOS, API keys are saved in Keychain. Prime Agent's `auth.json` and `models.json` contain only a shell reference that retrieves the secret at runtime; project files never receive the key. Saving a new default provider restarts the local RPC session so it takes effect immediately.
+
+Live web information is optional. For news, prices, current documentation, and other time-sensitive work, the Resources tab can enable Prime Agent's bundled Serper web-search skill. It also reports MCP, Skills, GitHub CLI, and local IPython readiness.
+
+<p align="center">
+  <img src="docs/assets/resources-center.jpg" alt="Prime Agent Desktop resource center with Serper web search, MCP connections, skills, GitHub CLI, and local IPython runtime">
+</p>
+
 ## Run it
 
 Requirements: Node.js 22.8+, npm, Rust/Tauri platform prerequisites, and the Prime Agent CLI.
@@ -104,9 +120,12 @@ See [docs/architecture.md](docs/architecture.md) for the integration rules.
 - [x] Prime Agent RPC process supervision
 - [x] Real streamed message and tool-call events
 - [x] Extension UI request/response round-trip
+- [x] Provider catalog and default-model configuration
+- [x] macOS Keychain credential storage
+- [x] Serper web-search resource configuration
 - [ ] Session reconnect and subagent observation
 - [ ] Memory/refine diff ingestion and rollback
-- [ ] Local encrypted credential storage
+- [ ] Windows Credential Manager and Linux Secret Service backends
 - [ ] Signed macOS and Windows preview builds
 - [ ] Auto-update channel
 

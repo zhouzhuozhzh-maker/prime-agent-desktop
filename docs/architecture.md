@@ -28,3 +28,11 @@ React UI
 5. Closing the window or changing adapters terminates the child process. Prime Agent's own daemon remains responsible for any resident scheduled work it has promoted.
 
 The browser-only build intentionally stays on `MockAgentAdapter`; local process access exists only in the Tauri shell.
+
+## Provider configuration
+
+The settings center reads Prime Agent's user-scoped `auth.json`, `models.json`, and `settings.json` through narrow Tauri commands. It never returns credential values to React.
+
+On macOS, a saved API key is placed in Keychain under a provider-specific service name. The Prime Agent config stores a `!security find-generic-password ...` resolver instead of the key itself. Custom OpenAI-compatible providers receive a `models.json` entry; built-in providers use Prime Agent's native catalog and only need an auth reference. Serper is stored as the service credential ID Prime Agent's bundled `websearch` skill already understands.
+
+All config files are written with user-only `0600` permissions. Existing unrelated providers, MCP servers, enabled models, and settings are preserved.
