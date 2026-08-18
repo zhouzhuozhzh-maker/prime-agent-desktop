@@ -1,15 +1,15 @@
 import {
   Brain,
   Clock3,
-  ExternalLink,
+  FileDiff,
   GitCommitHorizontal,
   Network,
   Plus,
   Sparkles,
 } from "lucide-react";
-import type { AgentNode, MemoryEntry, RefineEntry, ScheduleEntry } from "../types";
+import type { AgentNode, MemoryEntry, RefineEntry, ScheduleEntry, TimelineEvent } from "../types";
 
-export type InspectorTab = "agents" | "memory" | "refine" | "schedule";
+export type InspectorTab = "agents" | "changes" | "memory" | "refine" | "schedule";
 
 type InspectorProps = {
   activeTab: InspectorTab;
@@ -19,10 +19,13 @@ type InspectorProps = {
   refinements: RefineEntry[];
   schedules: ScheduleEntry[];
   onToggleSchedule: (id: string) => void;
+  events: TimelineEvent[];
+  onReviewChanges: () => void;
 };
 
 const tabs: Array<{ id: InspectorTab; label: string }> = [
-  { id: "agents", label: "Agent tree" },
+  { id: "agents", label: "Activity" },
+  { id: "changes", label: "Changes" },
   { id: "memory", label: "Memory" },
   { id: "refine", label: "Refine" },
   { id: "schedule", label: "Schedule" },
@@ -79,7 +82,7 @@ function RefineList({ entries, full = false }: { entries: RefineEntry[]; full?: 
             <div><strong>{entry.title}</strong>{full && <small>{entry.detail}</small>}</div>
           </article>
         ))}
-        {entries.length === 0 ? <div className="empty-ledger">No refinement events in this session</div> : <button className="section-link" type="button">View full ledger <ExternalLink size={13} /></button>}
+        {entries.length === 0 && <div className="empty-ledger">No refinement events in this session</div>}
       </div>
     </section>
   );
@@ -102,8 +105,29 @@ function ScheduleList({ schedules, onToggle }: { schedules: ScheduleEntry[]; onT
             ><i /></button>
           </article>
         ))}
-        {schedules.length === 0 ? <div className="empty-ledger">Schedule sync is not connected yet.</div> : <button className="section-link" type="button">View all schedules <ExternalLink size={13} /></button>}
+        {schedules.length === 0 && <div className="empty-ledger">Schedule sync is not connected yet.</div>}
       </div>
+    </section>
+  );
+}
+
+function ChangesList({ events, onReview }: { events: TimelineEvent[]; onReview: () => void }) {
+  const changes = events.filter((event) => event.type === "diff");
+  return (
+    <section className="inspector-section changes-section">
+      <div className="section-heading"><h2>Session changes</h2><span className="mint-label">{changes.length} file{changes.length === 1 ? "" : "s"}</span></div>
+      {changes.length > 0 ? (
+        <div className="changes-list">
+          {changes.map((change) => (
+            <article className="change-row" key={change.id}>
+              <FileDiff size={16} />
+              <div><strong>{change.meta || change.title}</strong><small>{change.title}</small></div>
+              <span><b>+18</b><em>−12</em></span>
+            </article>
+          ))}
+          <button className="review-button" onClick={onReview} type="button">Review changes in timeline</button>
+        </div>
+      ) : <div className="changes-empty"><FileDiff size={22} /><strong>No file changes yet</strong><p>Edits made during this session will collect here for review.</p></div>}
     </section>
   );
 }
@@ -116,6 +140,8 @@ export function Inspector({
   refinements,
   schedules,
   onToggleSchedule,
+  events,
+  onReviewChanges,
 }: InspectorProps) {
   return (
     <aside className="inspector">
@@ -130,9 +156,15 @@ export function Inspector({
         {activeTab === "agents" && (
           <>
             <AgentTree agents={agents} />
-            <MemoryList memories={memories} />
-            <RefineList entries={refinements} />
-            <ScheduleList schedules={schedules} onToggle={onToggleSchedule} />
+            {memories.length > 0 && <MemoryList memories={memories} />}
+            {refinements.length > 0 && <RefineList entries={refinements} />}
+            {schedules.length > 0 && <ScheduleList schedules={schedules} onToggle={onToggleSchedule} />}
+          </>
+        )}
+        {activeTab === "changes" && (
+          <>
+            <div className="tab-intro"><FileDiff size={20} /><div><h2>Review before you ship</h2><p>See what changed during this run and jump back to the full diff.</p></div></div>
+            <ChangesList events={events} onReview={onReviewChanges} />
           </>
         )}
         {activeTab === "memory" && (

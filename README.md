@@ -32,12 +32,16 @@ Prime Agent Desktop turns them into a visible, reviewable workspace.
 - **Refine ledger** — review durable changes to memories, prompts, and skills before they become invisible behavior.
 - **Schedules** — understand which jobs keep running after the terminal disconnects.
 - **Permission gates** — approve or reject consequential commands with the exact command and impact in view.
+- **Review loop** — collect file changes in one place, jump back to the full diff, and copy commands without leaving the task.
+- **Fast task control** — start clean sessions, reconnect interrupted runtimes, and steer agents with a keyboard-friendly multiline composer.
 
 ## Current state
 
 The native app now connects to Prime Agent's documented RPC mode. It launches `prime-agent --mode rpc` inside the folder you choose, supervises the process, correlates command responses, and renders streaming messages and tool execution events. Extension confirmations, selections, inputs, and editor requests make a round trip through the desktop UI.
 
 The browser build still uses `MockAgentAdapter`, so the product can be reviewed without granting an agent access to a local project. The live integration is tested against Prime Agent `0.7.3`.
+
+The desktop workflow is designed around a complete agent loop: start a task, supervise progress, intervene when needed, review changes, and recover from an interrupted runtime. Visible controls are functional; new sessions open with useful starter prompts, settings remember focus, and saved provider state is explicit.
 
 ## Models & resources
 
@@ -123,7 +127,8 @@ See [docs/architecture.md](docs/architecture.md) for the integration rules.
 - [x] Provider catalog and default-model configuration
 - [x] macOS Keychain credential storage
 - [x] Serper web-search resource configuration
-- [ ] Session reconnect and subagent observation
+- [x] Manual session reconnect and focused change review
+- [ ] Live subagent observation from upstream RPC events
 - [ ] Memory/refine diff ingestion and rollback
 - [ ] Windows Credential Manager and Linux Secret Service backends
 - [ ] Signed macOS and Windows preview builds
