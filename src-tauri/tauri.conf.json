@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Prime Agent Desktop",
+  "version": "0.1.0",
+  "identifier": "app.primeagent.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Prime Agent Desktop",
+        "width": 1500,
+        "height": 940,
+        "minWidth": 1080,
+        "minHeight": 700,
+        "decorations": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "See what your agents do, learn, and change.",
+    "longDescription": "An unofficial local-first desktop control center for Prime Agent."
+  }
+}
